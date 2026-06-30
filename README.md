@@ -1,4 +1,4 @@
-# KSP Crime Intelligence Platform
+markdown# KSP Crime Intelligence Platform
 
 AI-driven crime analytics and visualization platform built for the **Karnataka State Police Datathon 2026 — Challenge 2**.
 
@@ -23,3 +23,38 @@ This platform helps law enforcement identify repeat offenders who use multiple f
 - **Frontend**: HTML, CSS, Plotly.js, D3.js, Folium
 
 ## Project Structure
+ksp_crime_platform/
+├── app/
+│   ├── app.py              # Flask application & routes
+│   ├── static/
+│   │   └── theme.css       # Shared design system
+│   └── templates/
+│       ├── index.html      # Dashboard
+│       ├── dedup.html      # Identity deduplication
+│       ├── suspect.html    # Suspect profile page
+│       ├── network.html    # Cross-district network graph
+│       ├── district.html   # District drilldown
+│       └── map.html        # Hotspot map
+├── engines/
+│   ├── data_generator.py   # Synthetic FIR data generator
+│   ├── dedup_engine.py     # Identity deduplication engine
+│   └── hotspot_map.py      # Folium heatmap generator
+└── data/
+└── karnataka_fir_synthetic.csv
+
+## Running Locally
+
+```bash
+cd ksp_crime_platform
+python app/app.py
+```
+
+Then open `http://127.0.0.1:5000` in your browser.
+
+## Team
+
+Built by a team of 4 for the KSP Datathon 2026, Challenge 2.
+
+## Deployment
+
+Target deployment platform: **Zoho Catalyst**
