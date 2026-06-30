@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from flask import Flask, render_template, jsonify, request
 import pandas as pd
 import json
+import random
 
 from engines.data_generator import generate_fir_records
 from engines.dedup_engine import run_dedup, get_identity_clusters, search_suspect
@@ -27,6 +28,12 @@ df_raw     = load_data()
 df_deduped = run_dedup(df_raw, threshold=60.0)
 clusters   = get_identity_clusters(df_deduped)
 clusters_by_id = {c["cluster_id"]: c for c in clusters}
+
+alert_names = set()
+for c in clusters:
+    for n in c["names_found"]:
+        alert_names.add(n)
+
 print(f"Ready. {len(df_raw)} records. {len(clusters)} clusters found.")
 
 @app.route("/")
@@ -159,6 +166,22 @@ def api_district_crimes():
         total_crimes=("fir_id", "count")
     ).reset_index().sort_values("total_crimes", ascending=False)
     return jsonify(stats.to_dict("records"))
+
+@app.route("/api/live_feed")
+def api_live_feed():
+    sample = df_raw.sample(n=min(8, len(df_raw))).to_dict("records")
+    events = []
+    for rec in sample:
+        is_alert = rec["accused_name"] in alert_names
+        events.append({
+            "fir_id":      rec["fir_id"],
+            "district":    rec["district"],
+            "crime_type":  rec["crime_type"],
+            "accused_name": rec["accused_name"],
+            "time":        rec["fir_time"],
+            "is_alert":    is_alert,
+        })
+    return jsonify({"events": events})
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
