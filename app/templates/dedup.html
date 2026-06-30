@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suspect Deduplication — KSP Crime Intel</title>
+  <link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a>href="/">📊 Dashboard</a>
+<a href="/map">🗺 Hotspot Map</a>
+<a href="/dedup" class="active">🔗 Identity Dedup</a>
+<a href="/network">🕸 Network</a>
+<a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">Intelligence Engine</div>
+      <div class="page-title">Suspect Identity Deduplication</div>
+      <div class="page-sub">AI-powered engine detecting criminals using multiple fake identities across Karnataka. <strong style="color:#1e3a5f">{{ total_clusters }} clusters</strong> uncovered.</div>
+    </div>
+  </div>
+
+  <div class="search-bar">
+    <span style="color:#64748b;font-size:16px">🔍</span>
+    <input type="text" id="search-input" placeholder="Search suspect name — try: Raju Kumar" />
+    <button class="btn btn-blue" onclick="searchSuspect()">Search Records</button>
+  </div>
+  <div id="search-results"></div>
+
+  <div class="section-title">Top Identity Clusters — Same Criminal, Multiple Names</div>
+  <div style="font-size:12px; color:#64748b; margin-top:-10px; margin-bottom:16px;">💡 Click any cluster card to view the full suspect profile</div>
+
+  {% for cluster in clusters %}
+  <a href="/suspect/{{ cluster.cluster_id }}" style="text-decoration:none; color:inherit; display:block;">
+  <div class="cluster-card {% if cluster.confidence >= 80 %}high-conf{% endif %}">
+    <div class="cluster-header">
+      <div>
+        <div class="cluster-id">{{ cluster.cluster_id }}</div>
+        <div class="cluster-name">{{ cluster.alias_count }} aliases detected — same criminal</div>
+      </div>
+      <span class="badge {% if cluster.confidence >= 80 %}badge-red{% else %}badge-amber{% endif %}">
+        {{ cluster.confidence }}% confidence
+      </span>
+    </div>
+    <div class="alias-list">
+      {% for name in cluster.names_found %}
+      <span class="alias-tag">{{ name }}</span>
+      {% endfor %}
+    </div>
+    <div class="districts-line">📍 Active in: {{ cluster.districts | join(' · ') }}</div>
+    <div class="alert-line">
+      ⚠ {{ cluster.alias_count }} FIRs filed under different identities across {{ cluster.districts | length }} district(s) — never linked until now.
+    </div>
+  </div>
+  </a>
+  {% endfor %}
+</div>
+
+<script>
+function searchSuspect() {
+  const name = document.getElementById('search-input').value.trim();
+  if (!name) return;
+  const container = document.getElementById('search-results');
+  container.innerHTML = '<div style="color:#64748b;padding:10px 0">Searching records…</div>';
+  fetch(`/api/search_suspect?name=${encodeURIComponent(name)}`)
+    .then(r=>r.json())
+    .then(data=>{
+      if (!data.results.length) {
+        container.innerHTML = '<div style="color:#64748b;padding:10px 0">No records matched.</div>';
+        return;
+      }
+      let html = `<div style="font-size:12px;color:#64748b;margin-bottom:10px">${data.count} record(s) found for "<strong style="color:#0f172a">${name}</strong>"</div>`;
+      data.results.forEach(r=>{
+        const isCluster = r.cluster_size > 1;
+        const link = isCluster ? `/suspect/${r.cluster_id}` : '#';
+        html += `<a href="${link}" style="text-decoration:none;color:inherit;display:block;">
+        <div class="result-card">
+          <div>
+            <div class="result-name">${r.name}</div>
+            <div class="result-meta">Age ${r.age} · ${r.district} · ${r.crime_type} · FIR: ${r.fir_id}</div>
+            ${isCluster ? `<div style="margin-top:5px;color:#dc2626;font-size:12px;font-weight:500">⚠ Part of identity cluster — ${r.cluster_size} aliases found · click to view profile</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <span class="badge badge-blue">${Math.round(r.name_similarity)}% match</span>
+            ${isCluster ? `<div style="font-size:10px;color:#64748b;margin-top:4px;font-family:monospace">${r.cluster_id}</div>` : ''}
+          </div>
+        </div>
+        </a>`;
+      });
+      container.innerHTML = html;
+    });
+}
+document.getElementById('search-input').addEventListener('keypress',e=>{ if(e.key==='Enter') searchSuspect(); });
+</script>
+</body>
+</html>

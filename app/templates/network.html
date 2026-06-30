@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crime Network Graph — KSP Crime Intel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .network-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 16px;
+      align-items: start;
+    }
+    #network-container {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    #network-svg { width: 100%; height: 660px; display: block; cursor: grab; background: #fafbfc; }
+    #network-svg:active { cursor: grabbing; }
+
+    .link { stroke: #cbd5e1; stroke-opacity: 0.5; transition: stroke-opacity 0.2s, stroke 0.2s; }
+    .link.highlighted { stroke: #2563eb; stroke-opacity: 1; stroke-width: 2.5px; }
+    .link.dimmed { stroke-opacity: 0.08; }
+
+    .node circle { stroke: #fff; stroke-width: 2px; cursor: pointer; transition: opacity 0.2s, stroke-width 0.2s; }
+    .node.dimmed { opacity: 0.15; }
+    .node.focused circle { stroke-width: 3px; stroke: #0f172a; }
+
+    .node-label {
+      font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500;
+      fill: #1e293b; pointer-events: none; opacity: 0; transition: opacity 0.15s;
+    }
+    .node-label.always-on { opacity: 1; }
+    .node-label.district { font-size: 11px; font-weight: 700; fill: #1e3a5f; opacity: 1; }
+    .node:hover .node-label { opacity: 1; }
+
+    .legend {
+      position: absolute; top: 16px; left: 16px;
+      background: rgba(255,255,255,0.97);
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      max-width: 220px;
+    }
+    .legend-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    .tooltip {
+      position: absolute;
+      background: #0f172a;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      max-width: 260px;
+      z-index: 10;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .tooltip .ttitle { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+    .tooltip .tmeta { opacity: 0.75; font-size: 11px; line-height: 1.6; }
+    .tooltip .thint { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); font-size: 10px; color: #93c5fd; }
+
+    .net-sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .net-search {
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 10px;
+      padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .net-search input {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 6px;
+      padding: 8px 12px; font-size: 13px; outline: none; margin-top: 8px;
+    }
+    .net-search input:focus { border-color: #2563eb; }
+    .net-search label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .net-stat-card {
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 10px;
+      padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .net-stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 4px; }
+    .net-stat-value { font-size: 22px; font-weight: 700; color: #0f172a; font-family: monospace; }
+
+    .net-detail-card {
+      background: #1e3a5f; color: white; border-radius: 10px;
+      padding: 16px; min-height: 80px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .net-detail-card .placeholder { font-size: 12px; opacity: 0.6; }
+    .net-detail-card .dname { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .net-detail-card .ddesc { font-size: 12px; opacity: 0.8; line-height: 1.6; }
+    .net-detail-card a.view-link {
+      display: inline-block; margin-top: 10px; font-size: 12px;
+      color: #93c5fd; text-decoration: none; font-weight: 600;
+    }
+
+    .info-banner { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #64748b; margin-bottom: 16px; }
+
+    @media(max-width: 900px) {
+      .network-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup">🔗 Identity Dedup</a>
+  <a href="/network" class="active">🕸 Network</a>
+  <a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">Network Intelligence</div>
+      <div class="page-title">Cross-District Crime Network</div>
+      <div class="page-sub">Visualizing how repeat-offender clusters operate across district boundaries — every connection is a real link discovered by the deduplication engine</div>
+    </div>
+  </div>
+
+  <div class="info-banner">
+    💡 Darker red = more aliases · Drag nodes to rearrange · Click a suspect to open their profile
+  </div>
+
+  <div class="network-layout">
+    <div id="network-container">
+      <div class="legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#1e3a5f"></span> District</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#fca5a5"></span> Low-risk cluster</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#dc2626"></span> High-risk cluster</div>
+      </div>
+      <svg id="network-svg"></svg>
+    </div>
+
+    <div class="net-sidebar">
+      <div class="net-search">
+        <label>Search network</label>
+        <input type="text" id="net-search-input" placeholder="District or suspect name..." />
+      </div>
+
+      <div class="net-stat-card">
+        <div class="net-stat-label">Suspect Clusters Shown</div>
+        <div class="net-stat-value" id="stat-clusters">—</div>
+      </div>
+      <div class="net-stat-card">
+        <div class="net-stat-label">Districts Connected</div>
+        <div class="net-stat-value" id="stat-districts">—</div>
+      </div>
+      <div class="net-stat-card">
+        <div class="net-stat-label">Total Cross-Links</div>
+        <div class="net-stat-value" id="stat-links">—</div>
+      </div>
+
+      <div class="net-detail-card" id="detail-card">
+        <div class="placeholder">Hover or click a node to see details here.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const graphData = {{ graph_json | safe }};
+
+document.getElementById('stat-clusters').textContent = graphData.nodes.filter(n => n.type === 'cluster').length;
+document.getElementById('stat-districts').textContent = graphData.nodes.filter(n => n.type === 'district').length;
+document.getElementById('stat-links').textContent = graphData.links.length;
+
+const svg = d3.select("#network-svg");
+const container = document.getElementById("network-container");
+const width = container.clientWidth;
+const height = 660;
+svg.attr("viewBox", [0, 0, width, height]);
+
+const g = svg.append("g");
+
+svg.call(d3.zoom().scaleExtent([0.3, 4]).on("zoom", (event) => {
+  g.attr("transform", event.transform);
+}));
+
+const tooltip = d3.select("#tooltip");
+const detailCard = document.getElementById("detail-card");
+
+const maxAlias = d3.max(graphData.nodes.filter(n => n.type === 'cluster'), d => d.alias_count) || 1;
+const redScale = d3.scaleLinear().domain([1, maxAlias]).range(["#fca5a5", "#991b1b"]);
+
+const simulation = d3.forceSimulation(graphData.nodes)
+  .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(d => 95))
+  .force("charge", d3.forceManyBody().strength(-220))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => (d.r || 8) + 8));
+
+const link = g.append("g")
+  .selectAll("line")
+  .data(graphData.links)
+  .join("line")
+  .attr("class", "link")
+  .attr("stroke-width", 1);
+
+const node = g.append("g")
+  .selectAll("g")
+  .data(graphData.nodes)
+  .join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended));
+
+node.append("circle")
+  .attr("r", d => d.r || 8)
+  .attr("fill", d => d.type === 'district' ? '#1e3a5f' : redScale(d.alias_count || 1));
+
+node.append("text")
+  .attr("class", d => d.type === 'district' ? 'node-label district' : (d.r >= 16 ? 'node-label always-on' : 'node-label'))
+  .attr("dx", d => (d.r || 8) + 4)
+  .attr("dy", 4)
+  .text(d => d.label);
+
+function showDetail(d) {
+  if (d.type === 'cluster') {
+    detailCard.innerHTML = `
+      <div class="dname">${d.label}</div>
+      <div class="ddesc">${d.alias_count} aliases detected<br>${d.confidence}% match confidence<br>Names: ${d.names}</div>
+      <a class="view-link" href="/suspect/${d.cluster_id}">View full profile →</a>
+    `;
+  } else {
+    detailCard.innerHTML = `
+      <div class="dname">${d.label}</div>
+      <div class="ddesc">${d.cluster_count} suspect cluster(s) operate in this district</div>
+      <a class="view-link" href="/district?district=${encodeURIComponent(d.label)}">View district stats →</a>
+    `;
+  }
+}
+
+node
+  .on("mouseover", function(event, d) {
+    tooltip.style("opacity", 1);
+    let html = `<div class="ttitle">${d.label}</div>`;
+    if (d.type === 'cluster') {
+      html += `<div class="tmeta">${d.alias_count} aliases · ${d.confidence}% confidence<br>${d.names}</div>`;
+      html += `<div class="thint">Click to view full suspect profile</div>`;
+    } else {
+      html += `<div class="tmeta">${d.cluster_count} suspect cluster(s) active here</div>`;
+      html += `<div class="thint">Click to view district statistics</div>`;
+    }
+    tooltip.html(html);
+
+    const connected = new Set([d.id]);
+    graphData.links.forEach(l => {
+      if (l.source.id === d.id) connected.add(l.target.id);
+      if (l.target.id === d.id) connected.add(l.source.id);
+    });
+    node.classed("dimmed", n => !connected.has(n.id));
+    link.classed("highlighted", l => l.source.id === d.id || l.target.id === d.id)
+        .classed("dimmed", l => l.source.id !== d.id && l.target.id !== d.id);
+
+    showDetail(d);
+  })
+  .on("mousemove", function(event) {
+    tooltip.style("left", (event.pageX + 14) + "px")
+           .style("top", (event.pageY - 10) + "px");
+  })
+  .on("mouseout", function() {
+    tooltip.style("opacity", 0);
+    node.classed("dimmed", false);
+    link.classed("highlighted", false).classed("dimmed", false);
+  })
+  .on("click", function(event, d) {
+    if (d.type === 'cluster' && d.cluster_id) {
+      window.location.href = `/suspect/${d.cluster_id}`;
+    } else if (d.type === 'district') {
+      window.location.href = `/district?district=${encodeURIComponent(d.label)}`;
+    }
+  });
+
+simulation.on("tick", () => {
+  link
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+function dragstarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) {
+  d.fx = event.x; d.fy = event.y;
+}
+function dragended(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+document.getElementById('net-search-input').addEventListener('input', function(e) {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) {
+    node.classed("dimmed", false);
+    link.classed("dimmed", false).classed("highlighted", false);
+    return;
+  }
+  const matched = new Set();
+  graphData.nodes.forEach(n => {
+    const haystack = (n.label + ' ' + (n.names || '')).toLowerCase();
+    if (haystack.includes(q)) matched.add(n.id);
+  });
+  const expanded = new Set(matched);
+  graphData.links.forEach(l => {
+    if (matched.has(l.source.id)) expanded.add(l.target.id);
+    if (matched.has(l.target.id)) expanded.add(l.source.id);
+  });
+  node.classed("dimmed", n => !expanded.has(n.id));
+  link.classed("dimmed", l => !(expanded.has(l.source.id) && expanded.has(l.target.id)))
+      .classed("highlighted", l => matched.has(l.source.id) || matched.has(l.target.id));
+});
+</script>
+</body>
+</html>

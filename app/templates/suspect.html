@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suspect Profile — KSP Crime Intel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .profile-header {
+      background: #1e3a5f;
+      border-radius: 14px;
+      padding: 28px 32px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      color: white;
+    }
+    .avatar {
+      width: 72px; height: 72px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 700; flex-shrink: 0;
+      border: 3px solid rgba(255,255,255,0.3);
+    }
+    .profile-name { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .profile-meta { font-size: 13px; opacity: 0.75; }
+    .profile-badges { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .pbadge {
+      font-size: 11px; font-weight: 600; padding: 4px 12px;
+      border-radius: 20px; background: rgba(255,255,255,0.15);
+      color: white;
+    }
+    .pbadge.red { background: #dc2626; }
+    .pbadge.amber { background: #d97706; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    .alias-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+    .alias-card {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 160px;
+    }
+    .alias-card.primary { background: #1e3a5f; border-color: #1e3a5f; color: white; }
+    .alias-card .aname { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .alias-card .ameta { font-size: 11px; opacity: 0.7; }
+
+    .fir-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .fir-table th {
+      text-align: left; padding: 10px 14px;
+      background: #f1f5f9; color: #334155;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .fir-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+    .fir-table tr:hover td { background: #f8fafc; }
+    .status-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px;
+      border-radius: 20px;
+    }
+    .status-open   { background: #fef2f2; color: #dc2626; }
+    .status-closed { background: #f0fdf4; color: #16a34a; }
+    .status-under  { background: #fffbeb; color: #d97706; }
+    .status-charge { background: #eff6ff; color: #2563eb; }
+
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #2563eb; font-size: 13px; font-weight: 500;
+      text-decoration: none; margin-bottom: 20px;
+    }
+    .back-btn:hover { color: #1e3a5f; }
+
+    @media(max-width:768px) {
+      .two-col, .three-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup" class="active">🔗 Identity Dedup</a>
+  <a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <a href="/dedup" class="back-btn">← Back to Deduplication</a>
+
+  <!-- Profile Header -->
+  <div class="profile-header">
+    <div class="avatar">{{ cluster.names_found[0][0] | upper }}</div>
+    <div>
+      <div class="profile-name">{{ cluster.names_found[0] }}</div>
+      <div class="profile-meta">Cluster ID: {{ cluster.cluster_id }} · {{ cluster.alias_count }} identities detected across {{ cluster.districts | length }} district(s)</div>
+      <div class="profile-badges">
+        <span class="pbadge red">⚠ {{ cluster.alias_count }} Fake Identities</span>
+        <span class="pbadge amber">{{ cluster.confidence }}% Confidence</span>
+        {% for d in cluster.districts %}
+        <span class="pbadge">📍 {{ d }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="three-col">
+    <div class="stat-card accent-red">
+      <div class="stat-label">Aliases Detected</div>
+      <div class="stat-value">{{ cluster.alias_count }}</div>
+      <div class="stat-hint warning">Fake identities used</div>
+    </div>
+    <div class="stat-card accent-blue">
+      <div class="stat-label">Districts Active</div>
+      <div class="stat-value">{{ cluster.districts | length }}</div>
+      <div class="stat-hint">Across Karnataka</div>
+    </div>
+    <div class="stat-card accent-purple">
+      <div class="stat-label">Match Confidence</div>
+      <div class="stat-value">{{ cluster.confidence }}%</div>
+      <div class="stat-hint info">AI detection score</div>
+    </div>
+  </div>
+
+  <!-- Aliases -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Known Aliases — All Identities Used</div>
+    <div class="alias-grid">
+      {% for rec in cluster.records %}
+      <div class="alias-card {% if loop.first %}primary{% endif %}">
+        <div class="aname">{{ rec.accused_name }}</div>
+        <div class="ameta">Age {{ rec.accused_age }} · {{ rec.district }}</div>
+        <div class="ameta">{{ rec.crime_type }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Crime Type Breakdown</div>
+      <div id="crime-chart" style="height:240px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Districts Active In</div>
+      <div id="district-chart" style="height:240px"></div>
+    </div>
+  </div>
+
+  <!-- FIR Table -->
+  <div class="card">
+    <div class="card-title">Full FIR History</div>
+    <table class="fir-table">
+      <thead>
+        <tr>
+          <th>FIR ID</th>
+          <th>Name Used</th>
+          <th>Age</th>
+          <th>District</th>
+          <th>Crime Type</th>
+          <th>Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rec in cluster.records %}
+        <tr>
+          <td style="font-family:monospace; color:#2563eb">{{ rec.fir_id }}</td>
+          <td style="font-weight:600">{{ rec.accused_name }}</td>
+          <td>{{ rec.accused_age }}</td>
+          <td>{{ rec.district }}</td>
+          <td>{{ rec.crime_type }}</td>
+          <td style="font-family:monospace">{{ rec.fir_date }}</td>
+          <td>
+            {% if rec.case_status == 'Open' %}
+            <span class="status-badge status-open">Open</span>
+            {% elif rec.case_status == 'Closed' %}
+            <span class="status-badge status-closed">Closed</span>
+            {% elif rec.case_status == 'Under Investigation' %}
+            <span class="status-badge status-under">Investigating</span>
+            {% else %}
+            <span class="status-badge status-charge">Charge Sheeted</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const records = {{ cluster.records | tojson }};
+
+const crimeCounts = {};
+records.forEach(r => { crimeCounts[r.crime_type] = (crimeCounts[r.crime_type] || 0) + 1; });
+Plotly.newPlot('crime-chart', [{
+  type: 'pie',
+  labels: Object.keys(crimeCounts),
+  values: Object.values(crimeCounts),
+  hole: 0.4,
+  marker: { colors: ['#2563eb','#dc2626','#d97706','#16a34a','#7c3aed','#0891b2'] },
+  textfont: { size: 11 }
+}], {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#64748b', size: 11, family: 'Inter,sans-serif' },
+  showlegend: false, margin: { t:10, b:10, l:10, r:10 }
+});
+
+const distCounts = {};
+records.forEach(r => { distCounts[r.district] = (distCounts[r.district] || 0) + 1; });
+Plotly.newPlot('district-chart', [{
+  type: 'bar',
+  x: Object.keys(distCounts),
+  y: Object.values(distCounts),
+  marker: { color: '#1e3a5f' }
+}], {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#64748b', size: 11, family: 'Inter,sans-serif' },
+  xaxis: { gridcolor: '#e2e8f0', tickangle: -30 },
+  yaxis: { gridcolor: '#e2e8f0' },
+  margin: { t:10, b:80, l:40, r:10 }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>District Drilldown — KSP Crime Intel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    /* District page specific layout */
+    .district-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .district-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 900px) {
+      .district-layout { grid-template-columns: 1fr; }
+      .district-stat-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+<a href="/map">🗺 Hotspot Map</a>
+<a href="/dedup">🔗 Identity Dedup</a>
+<a href="/network">🕸 Network</a>
+<a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-eyebrow">District Intelligence</div>
+  <div class="page-title">District Drilldown</div>
+  <div class="page-sub">Select a district to view its crime breakdown and case statistics</div>
+
+  <div class="district-layout">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-title">All Districts</div>
+      {% for ds in district_stats %}
+      <a href="/district?district={{ ds.district }}" style="text-decoration:none">
+        <button class="district-btn {% if ds.district == selected %}active{% endif %}">
+          <span>{{ ds.district }}</span><br>
+          <span class="crime-count">{{ ds.total_crimes }} FIRs</span>
+        </button>
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Content -->
+    <div>
+      <!-- District stats mini-row -->
+      <div class="district-stat-row">
+        <div class="stat-card accent-amber">
+          <div class="stat-label">Total FIRs</div>
+          <div class="stat-value" style="font-size:28px">{{ total }}</div>
+          <div class="stat-hint">{{ selected }}</div>
+        </div>
+        <div class="stat-card accent-red">
+          <div class="stat-label">Top Crime</div>
+          <div class="stat-value" style="font-size:16px; margin-top:8px; font-family:var(--font-ui)">
+            {{ crime_breakdown | dictsort(by='value') | reverse | first | first if crime_breakdown else '—' }}
+          </div>
+          <div class="stat-hint warning">Highest frequency</div>
+        </div>
+        <div class="stat-card accent-purple">
+          <div class="stat-label">Crime Types</div>
+          <div class="stat-value" style="font-size:28px">{{ crime_breakdown | length }}</div>
+          <div class="stat-hint info">Distinct categories</div>
+        </div>
+      </div>
+
+      <!-- Chart card -->
+      <div class="card">
+        <div class="card-title">Crime Type Breakdown — {{ selected }}</div>
+        <div id="crime-chart" style="height:380px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const breakdown = {{ crime_breakdown | tojson }};
+const labels = Object.keys(breakdown);
+const values = Object.values(breakdown);
+
+// Sort by value descending
+const sorted = labels.map((l, i) => ({ l, v: values[i] }))
+  .sort((a, b) => b.v - a.v);
+
+Plotly.newPlot('crime-chart', [{
+  type: 'bar',
+  x: sorted.map(d => d.l),
+  y: sorted.map(d => d.v),
+  marker: {
+    color: sorted.map((_, i) => {
+      const intensity = 1 - (i / sorted.length) * 0.6;
+      return `rgba(245, 158, 11, ${intensity})`;
+    })
+  },
+}], {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#94a3b8', size: 12, family: 'Inter, sans-serif' },
+  xaxis: { gridcolor: '#252b40', tickangle: -35, color: '#94a3b8' },
+  yaxis: { gridcolor: '#252b40', title: { text: 'Number of FIRs', font: { color: '#475569' } }, color: '#94a3b8' },
+  margin: { t: 10, b: 130, l: 60, r: 20 },
+  bargap: 0.3,
+});
+</script>
+</body>
+</html>
