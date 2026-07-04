@@ -8,6 +8,7 @@ import random
 
 from engines.data_generator import generate_fir_records
 from engines.dedup_engine import run_dedup, get_identity_clusters, search_suspect
+from engines.anomaly_detector import detect_anomalies, get_anomaly_summary
 
 app = Flask(__name__, static_folder="static")
 
@@ -35,6 +36,11 @@ for c in clusters:
         alert_names.add(n)
 
 print(f"Ready. {len(df_raw)} records. {len(clusters)} clusters found.")
+
+anomalies = detect_anomalies(df_raw)
+anomaly_summary = get_anomaly_summary(anomalies)
+print(f"Anomaly detection: {anomaly_summary['total']} spikes found "
+      f"({anomaly_summary['critical']} critical)")
 
 @app.route("/")
 def index():
@@ -140,6 +146,10 @@ def map_page():
                            map_html=map_html,
                            crime_types=crime_types,
                            selected=crime_type)
+
+@app.route("/alerts")
+def alerts_page():
+    return render_template("alerts.html", anomalies=anomalies, summary=anomaly_summary)
 
 @app.route("/api/search_suspect")
 def api_search():

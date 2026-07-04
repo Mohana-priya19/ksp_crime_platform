@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anomaly Alerts — KSP Crime Intel</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .anomaly-card {
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #d97706;
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .anomaly-card.critical { border-left-color: #dc2626; background: #fef9f9; }
+    .anomaly-left { flex: 1; }
+    .anomaly-district { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .anomaly-meta { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+    .anomaly-stats { display: flex; gap: 20px; font-size: 12px; color: #334155; }
+    .anomaly-stat-num { font-family: monospace; font-weight: 700; font-size: 14px; color: #0f172a; }
+    .severity-badge {
+      font-size: 11px; font-weight: 700; padding: 5px 14px;
+      border-radius: 20px; letter-spacing: 0.04em; flex-shrink: 0;
+    }
+    .severity-elevated { background: #fffbeb; color: #d97706; }
+    .severity-critical { background: #fef2f2; color: #dc2626; }
+    .z-bar-track { width: 100px; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+    .z-bar-fill { height: 100%; border-radius: 3px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup">🔗 Identity Dedup</a>
+  <a href="/network">🕸 Network</a>
+  <a href="/alerts" class="active">🚨 Anomaly Alerts</a>
+  <a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">Statistical Intelligence</div>
+      <div class="page-title">Anomaly Detection</div>
+      <div class="page-sub">Automatically flags months where a district's crime count is a statistical outlier compared to its own historical average — surfacing genuine spikes, not just high-volume districts</div>
+    </div>
+  </div>
+
+  <div class="three-col stats-grid">
+    <div class="stat-card accent-red">
+      <div class="stat-label">Total Anomalies Detected</div>
+      <div class="stat-value">{{ summary.total }}</div>
+      <div class="stat-hint warning">Across all districts</div>
+    </div>
+    <div class="stat-card accent-amber" style="border-top-color:#d97706">
+      <div class="stat-label">Critical Severity</div>
+      <div class="stat-value">{{ summary.critical }}</div>
+      <div class="stat-hint" style="color:#d97706">Z-score ≥ 3.0</div>
+    </div>
+    <div class="stat-card accent-blue">
+      <div class="stat-label">Districts Affected</div>
+      <div class="stat-value">{{ summary.districts_affected }}</div>
+      <div class="stat-hint">Showing unusual activity</div>
+    </div>
+  </div>
+
+  <div class="section-title">Detected Spikes — Sorted by Severity</div>
+
+  {% if anomalies %}
+    {% for a in anomalies %}
+    <div class="anomaly-card {% if a.severity == 'Critical' %}critical{% endif %}">
+      <div class="anomaly-left">
+        <div class="anomaly-district">📍 {{ a.district }} — {{ a.month }}</div>
+        <div class="anomaly-meta">Dominant crime type: <strong>{{ a.top_crime_type }}</strong></div>
+        <div class="anomaly-stats">
+          <div>
+            <div class="anomaly-stat-num">{{ a.crime_count }}</div>
+            <div>FIRs this month</div>
+          </div>
+          <div>
+            <div class="anomaly-stat-num">{{ a.historical_avg }}</div>
+            <div>Historical avg</div>
+          </div>
+          <div>
+            <div class="anomaly-stat-num">+{{ a.pct_above_avg }}%</div>
+            <div>Above normal</div>
+          </div>
+          <div>
+            <div class="anomaly-stat-num">z = {{ a.z_score }}</div>
+            <div class="z-bar-track">
+              <div class="z-bar-fill" style="width:{{ [a.z_score * 25, 100] | min }}%; background:{% if a.severity == 'Critical' %}#dc2626{% else %}#d97706{% endif %}"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span class="severity-badge {% if a.severity == 'Critical' %}severity-critical{% else %}severity-elevated{% endif %}">
+        {{ a.severity }}
+      </span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="card empty-state">
+      <div style="font-size:32px; margin-bottom:12px;">✓</div>
+      <div>No statistical anomalies detected in the current dataset.</div>
+    </div>
+  {% endif %}
+
+</div>
+</body>
+</html>
