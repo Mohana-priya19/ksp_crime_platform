@@ -100,13 +100,14 @@
   <a href="/">📊 Dashboard</a>
   <a href="/map">🗺 Hotspot Map</a>
   <a href="/dedup" class="active">🔗 Identity Dedup</a>
+  <a href="/network">🕸 Network</a>
+  <a href="/alerts">🚨 Alerts</a>
   <a href="/district">📍 Districts</a>
 </nav>
 
 <div class="page">
   <a href="/dedup" class="back-btn">← Back to Deduplication</a>
 
-  <!-- Profile Header -->
   <div class="profile-header">
     <div class="avatar">{{ cluster.names_found[0][0] | upper }}</div>
     <div>
@@ -122,7 +123,6 @@
     </div>
   </div>
 
-  <!-- Stats row -->
   <div class="three-col">
     <div class="stat-card accent-red">
       <div class="stat-label">Aliases Detected</div>
@@ -141,7 +141,6 @@
     </div>
   </div>
 
-  <!-- Aliases -->
   <div class="card" style="margin-bottom:16px">
     <div class="card-title">Known Aliases — All Identities Used</div>
     <div class="alias-grid">
@@ -155,7 +154,6 @@
     </div>
   </div>
 
-  <!-- Charts -->
   <div class="two-col">
     <div class="card">
       <div class="card-title">Crime Type Breakdown</div>
@@ -167,7 +165,6 @@
     </div>
   </div>
 
-  <!-- FIR Table -->
   <div class="card">
     <div class="card-title">Full FIR History</div>
     <table class="fir-table">
