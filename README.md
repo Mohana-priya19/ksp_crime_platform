@@ -4,7 +4,7 @@ AI-driven crime analytics and visualization platform built for the **Karnataka S
 
 ## Overview
 
-This platform helps law enforcement identify repeat offenders who use multiple fake identities across different districts, visualize crime hotspots, and explore district-level crime statistics — all from a single, real-time dashboar
+This platform helps law enforcement identify repeat offenders who use multiple fake identities across different districts, visualize crime hotspots, and explore district-level crime statistics — all from a single, real-time dashboarD.
 
 ## Features
 
