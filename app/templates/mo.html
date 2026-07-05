@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MO Fingerprinting — KSP Crime Intel</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .mo-input-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
+    }
+    .mo-textarea {
+      width: 100%;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: var(--font-ui);
+      line-height: 1.6;
+      resize: vertical;
+      min-height: 120px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .mo-textarea::placeholder { color: var(--text-muted); }
+    .mo-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+    .example-queries { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 16px; }
+    .example-chip {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-mono);
+    }
+    .example-chip:hover { border-color: var(--blue); color: var(--blue-bright); background: rgba(59,130,246,0.08); }
+
+    .result-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-card);
+      transition: all 0.15s;
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+    .result-card:hover { border-left-color: var(--blue); transform: translateX(3px); }
+    .result-card.high { border-left-color: var(--green); }
+    .result-card.mid  { border-left-color: var(--amber); }
+    .result-card.low  { border-left-color: var(--text-muted); }
+
+    .sim-score { text-align: center; }
+    .sim-num { font-size: 22px; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
+    .sim-num.high { color: var(--green); }
+    .sim-num.mid  { color: var(--amber); }
+    .sim-num.low  { color: var(--text-muted); }
+    .sim-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); margin-top: 2px; }
+
+    .result-body .fir-id { font-family: var(--font-mono); font-size: 11px; color: var(--blue-bright); margin-bottom: 4px; }
+    .result-body .crime  { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+    .result-body .meta   { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+    .result-body .tags   { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 8px;
+      font-size: 11px; color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .tag.match { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.2); color: var(--blue-bright); }
+
+    .status-badge {
+      font-size: 11px; font-weight: 600; padding: 4px 12px;
+      border-radius: 20px; font-family: var(--font-mono); white-space: nowrap;
+    }
+    .status-open   { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .status-closed { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .status-under  { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .status-charge { background: rgba(59,130,246,0.15); color: var(--blue-bright); }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); font-family: var(--font-mono); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup">🔗 Identity Dedup</a>
+  <a href="/alerts">🚨 Alerts</a>
+  <a href="/network">🕸 Network</a>
+  <a href="/mo" class="active">🔎 MO Search</a>
+  <a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">// MO FINGERPRINTING ENGINE</div>
+      <div class="page-title">Modus Operandi Search</div>
+      <div class="page-sub">Describe a crime in plain language — the engine finds the 5 most similar past cases from 5,010 FIRs using AI vector similarity. Connects cases across districts and years that were never manually linked.</div>
+    </div>
+  </div>
+
+  <div class="mo-input-card">
+    <div class="card-title">Describe the Crime</div>
+    <textarea class="mo-textarea" id="mo-input" placeholder="e.g. Residential break-in at 2am, elderly woman attacked, cash stolen, no witnesses, Mysuru district..."></textarea>
+    <div style="font-size:11px; color:var(--text-muted); margin-top:8px; margin-bottom:12px; font-family:var(--font-mono);">// Try these example queries:</div>
+    <div class="example-queries">
+      <span class="example-chip" onclick="setQuery(this)">Residential break-in 2am elderly victim cash stolen Mysuru</span>
+      <span class="example-chip" onclick="setQuery(this)">Chain snatching road attack young woman gold jewellery Bengaluru</span>
+      <span class="example-chip" onclick="setQuery(this)">Vehicle theft parking night Hubballi no weapon</span>
+      <span class="example-chip" onclick="setQuery(this)">Assault knife commercial area afternoon Mangaluru</span>
+    </div>
+    <button class="btn btn-blue" onclick="searchMO()" style="margin-top:4px">🔎 Find Similar Cases</button>
+  </div>
+
+  <div id="results-section">
+    <div class="empty-state">
+      <div class="icon">🔎</div>
+      <div>Enter a crime description above to find similar past cases</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setQuery(el) {
+  document.getElementById('mo-input').value = el.textContent;
+  searchMO();
+}
+
+function getScoreClass(score) {
+  if (score >= 30) return 'high';
+  if (score >= 15) return 'mid';
+  return 'low';
+}
+
+function getStatusClass(status) {
+  if (status === 'Open') return 'status-open';
+  if (status === 'Closed') return 'status-closed';
+  if (status === 'Under Investigation') return 'status-under';
+  return 'status-charge';
+}
+
+function searchMO() {
+  const query = document.getElementById('mo-input').value.trim();
+  if (!query) return;
+
+  const section = document.getElementById('results-section');
+  section.innerHTML = '<div class="loading">⟳ Scanning 5,010 FIR records for pattern matches...</div>';
+
+  fetch('/api/mo_search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.results || data.results.length === 0) {
+      section.innerHTML = '<div class="empty-state"><div class="icon">⚠</div><div>No similar cases found.</div></div>';
+      return;
+    }
+
+    let html = `
+      <div class="section-title">Top ${data.results.length} Similar Cases — Ranked by Pattern Match</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:16px; font-family:var(--font-mono);">
+        // Query: "${query}"
+      </div>
+    `;
+
+    data.results.forEach((r, i) => {
+      const sc = getScoreClass(r.similarity);
+      const stClass = getStatusClass(r.case_status);
+      html += `
+        <div class="result-card ${sc}">
+          <div class="sim-score">
+            <div class="sim-num ${sc}">${r.similarity}%</div>
+            <div class="sim-label">match</div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:4px; font-family:var(--font-mono)">#${i+1}</div>
+          </div>
+          <div class="result-body">
+            <div class="fir-id">${r.fir_id}</div>
+            <div class="crime">${r.crime_type}</div>
+            <div class="meta">📍 ${r.district} · 📅 ${r.fir_date} · 🕐 ${r.fir_time} · 👤 Victim age ${r.victim_age}</div>
+            <div class="tags">
+              <span class="tag match">${r.crime_type}</span>
+              <span class="tag match">${r.district}</span>
+              <span class="tag">${r.location_type}</span>
+              <span class="tag">${r.weapon_used}</span>
+              <span class="tag">Accused: ${r.accused_name}</span>
+            </div>
+          </div>
+          <div>
+            <span class="status-badge ${stClass}">${r.case_status}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    section.innerHTML = html;
+  })
+  .catch(() => {
+    section.innerHTML = '<div class="empty-state"><div class="icon">⚠</div><div>Search failed. Please try again.</div></div>';
+  });
+}
+
+document.getElementById('mo-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.ctrlKey) searchMO();
+});
+</script>
+</body>
+</html>

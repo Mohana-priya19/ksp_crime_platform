@@ -9,6 +9,7 @@ import random
 from engines.data_generator import generate_fir_records
 from engines.dedup_engine import run_dedup, get_identity_clusters, search_suspect
 from engines.anomaly_detector import detect_anomalies, get_anomaly_summary
+from engines.mo_engine import build_mo_index, search_similar_cases
 
 app = Flask(__name__, static_folder="static")
 
@@ -39,8 +40,11 @@ print(f"Ready. {len(df_raw)} records. {len(clusters)} clusters found.")
 
 anomalies = detect_anomalies(df_raw)
 anomaly_summary = get_anomaly_summary(anomalies)
-print(f"Anomaly detection: {anomaly_summary['total']} spikes found "
-      f"({anomaly_summary['critical']} critical)")
+print(f"Anomaly detection: {anomaly_summary['total']} spikes found ({anomaly_summary['critical']} critical)")
+
+print("Building MO index...")
+mo_vectorizer, mo_matrix = build_mo_index(df_raw)
+print("MO index ready.")
 
 @app.route("/")
 def index():
@@ -151,6 +155,19 @@ def map_page():
 def alerts_page():
     return render_template("alerts.html", anomalies=anomalies, summary=anomaly_summary)
 
+@app.route("/mo")
+def mo_page():
+    return render_template("mo.html")
+
+@app.route("/api/mo_search", methods=["POST"])
+def api_mo_search():
+    data = request.get_json()
+    query = data.get("query", "").strip()
+    if not query:
+        return jsonify({"error": "query required"}), 400
+    results = search_similar_cases(query, mo_vectorizer, mo_matrix, df_raw, top_n=5)
+    return jsonify({"results": results, "query": query})
+
 @app.route("/api/search_suspect")
 def api_search():
     name = request.args.get("name", "")
@@ -184,12 +201,12 @@ def api_live_feed():
     for rec in sample:
         is_alert = rec["accused_name"] in alert_names
         events.append({
-            "fir_id":      rec["fir_id"],
-            "district":    rec["district"],
-            "crime_type":  rec["crime_type"],
+            "fir_id":       rec["fir_id"],
+            "district":     rec["district"],
+            "crime_type":   rec["crime_type"],
             "accused_name": rec["accused_name"],
-            "time":        rec["fir_time"],
-            "is_alert":    is_alert,
+            "time":         rec["fir_time"],
+            "is_alert":     is_alert,
         })
     return jsonify({"events": events})
 
