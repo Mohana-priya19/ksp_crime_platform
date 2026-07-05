@@ -55,15 +55,15 @@
       margin-bottom: 10px;
       box-shadow: var(--shadow-card);
       transition: all 0.15s;
-      display: grid;
-      grid-template-columns: 80px 1fr auto;
-      gap: 16px;
-      align-items: center;
+      cursor: pointer;
+      display: block;
     }
     .result-card:hover { border-left-color: var(--blue); transform: translateX(3px); }
     .result-card.high { border-left-color: var(--green); }
     .result-card.mid  { border-left-color: var(--amber); }
     .result-card.low  { border-left-color: var(--text-muted); }
+
+    .result-top { display: grid; grid-template-columns: 80px 1fr auto; gap: 16px; align-items: center; }
 
     .sim-score { text-align: center; }
     .sim-num { font-size: 22px; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
@@ -92,6 +92,34 @@
     .status-closed { background: rgba(16,185,129,0.15); color: #6ee7b7; }
     .status-under  { background: rgba(245,158,11,0.15); color: #fcd34d; }
     .status-charge { background: rgba(59,130,246,0.15); color: var(--blue-bright); }
+
+    .expand-panel {
+      display: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .expand-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .expand-block {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .expand-block-title {
+      font-size: 9px; color: var(--text-muted);
+      font-family: var(--font-mono); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 8px;
+    }
+    .expand-row {
+      font-size: 12px; color: var(--text-secondary);
+      line-height: 1.9; display: flex; gap: 6px;
+    }
+    .expand-key { color: var(--text-muted); flex-shrink: 0; }
 
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
@@ -167,6 +195,14 @@ function getStatusClass(status) {
   return 'status-charge';
 }
 
+function toggleExpand(card) {
+  const panel = card.querySelector('.expand-panel');
+  const hint = card.querySelector('.expand-hint');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if (hint) hint.textContent = isOpen ? 'click to expand ▼' : 'click to collapse ▲';
+}
+
 function searchMO() {
   const query = document.getElementById('mo-input').value.trim();
   if (!query) return;
@@ -189,7 +225,7 @@ function searchMO() {
     let html = `
       <div class="section-title">Top ${data.results.length} Similar Cases — Ranked by Pattern Match</div>
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:16px; font-family:var(--font-mono);">
-        // Query: "${query}"
+        // Query: "${query}" · Click any case to expand full details
       </div>
     `;
 
@@ -197,26 +233,54 @@ function searchMO() {
       const sc = getScoreClass(r.similarity);
       const stClass = getStatusClass(r.case_status);
       html += `
-        <div class="result-card ${sc}">
-          <div class="sim-score">
-            <div class="sim-num ${sc}">${r.similarity}%</div>
-            <div class="sim-label">match</div>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:4px; font-family:var(--font-mono)">#${i+1}</div>
-          </div>
-          <div class="result-body">
-            <div class="fir-id">${r.fir_id}</div>
-            <div class="crime">${r.crime_type}</div>
-            <div class="meta">📍 ${r.district} · 📅 ${r.fir_date} · 🕐 ${r.fir_time} · 👤 Victim age ${r.victim_age}</div>
-            <div class="tags">
-              <span class="tag match">${r.crime_type}</span>
-              <span class="tag match">${r.district}</span>
-              <span class="tag">${r.location_type}</span>
-              <span class="tag">${r.weapon_used}</span>
-              <span class="tag">Accused: ${r.accused_name}</span>
+        <div class="result-card ${sc}" onclick="toggleExpand(this)">
+          <div class="result-top">
+            <div class="sim-score">
+              <div class="sim-num ${sc}">${r.similarity}%</div>
+              <div class="sim-label">match</div>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:4px; font-family:var(--font-mono)">#${i+1}</div>
+            </div>
+            <div class="result-body">
+              <div class="fir-id">${r.fir_id}</div>
+              <div class="crime">${r.crime_type}</div>
+              <div class="meta">📍 ${r.district} · 📅 ${r.fir_date} · 🕐 ${r.fir_time} · 👤 Victim age ${r.victim_age}</div>
+              <div class="tags">
+                <span class="tag match">${r.crime_type}</span>
+                <span class="tag match">${r.district}</span>
+                <span class="tag">${r.location_type}</span>
+                <span class="tag">${r.weapon_used}</span>
+                <span class="tag">Accused: ${r.accused_name}</span>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+              <span class="status-badge ${stClass}">${r.case_status}</span>
+              <span class="expand-hint" style="font-size:10px; color:var(--text-muted); font-family:var(--font-mono);">click to expand ▼</span>
             </div>
           </div>
-          <div>
-            <span class="status-badge ${stClass}">${r.case_status}</span>
+
+          <div class="expand-panel">
+            <div class="expand-grid">
+              <div class="expand-block">
+                <div class="expand-block-title">FIR Details</div>
+                <div class="expand-row"><span class="expand-key">FIR ID:</span> <span style="font-family:var(--font-mono); color:var(--blue-bright)">${r.fir_id}</span></div>
+                <div class="expand-row"><span class="expand-key">Date:</span> ${r.fir_date}</div>
+                <div class="expand-row"><span class="expand-key">Time:</span> ${r.fir_time}</div>
+                <div class="expand-row"><span class="expand-key">Status:</span> <span class="status-badge ${stClass}" style="padding:1px 8px; font-size:10px;">${r.case_status}</span></div>
+              </div>
+              <div class="expand-block">
+                <div class="expand-block-title">Crime Details</div>
+                <div class="expand-row"><span class="expand-key">Type:</span> ${r.crime_type}</div>
+                <div class="expand-row"><span class="expand-key">District:</span> ${r.district}</div>
+                <div class="expand-row"><span class="expand-key">Location:</span> ${r.location_type}</div>
+                <div class="expand-row"><span class="expand-key">Weapon:</span> ${r.weapon_used}</div>
+              </div>
+              <div class="expand-block">
+                <div class="expand-block-title">People</div>
+                <div class="expand-row"><span class="expand-key">Accused:</span> ${r.accused_name}</div>
+                <div class="expand-row"><span class="expand-key">Victim Age:</span> ${r.victim_age}</div>
+                <div class="expand-row"><span class="expand-key">Match Score:</span> <span style="color:var(--green); font-family:var(--font-mono); font-weight:700;">${r.similarity}%</span></div>
+              </div>
+            </div>
           </div>
         </div>
       `;
