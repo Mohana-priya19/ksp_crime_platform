@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crime Trends — KSP Crime Intel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .controls-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      gap: 20px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    .control-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); }
+    .control-select {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: var(--font-ui);
+      outline: none;
+      cursor: pointer;
+      min-width: 160px;
+      transition: border-color 0.15s;
+    }
+    .control-select:focus { border-color: var(--blue); }
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .insight-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      box-shadow: var(--shadow-card);
+    }
+    .insight-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); margin-bottom: 6px; }
+    .insight-value { font-size: 20px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+    .insight-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup">🔗 Identity Dedup</a>
+  <a href="/alerts">🚨 Alerts</a>
+  <a href="/network">🕸 Network</a>
+  <a href="/mo">🔎 MO Search</a>
+  <a href="/trends" class="active">📈 Trends</a>
+  <a href="/district">📍 Districts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">// TEMPORAL INTELLIGENCE</div>
+      <div class="page-title">Crime Trend Timeline</div>
+      <div class="page-sub">Month-wise crime evolution across Karnataka districts — identify seasonal patterns, rising hotspots, and long-term trends from 2018 to 2023.</div>
+    </div>
+  </div>
+
+  <div class="controls-card">
+    <div class="control-group">
+      <div class="control-label">View Mode</div>
+      <select class="control-select" id="view-mode" onchange="updateChart()">
+        <option value="all_districts">All Districts — Stacked</option>
+        <option value="single_district">Single District</option>
+        <option value="crime_type">By Crime Type</option>
+      </select>
+    </div>
+    <div class="control-group" id="district-group" style="display:none">
+      <div class="control-label">District</div>
+      <select class="control-select" id="district-select" onchange="updateChart()"></select>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Chart Type</div>
+      <select class="control-select" id="chart-type" onchange="updateChart()">
+        <option value="line">Line Chart</option>
+        <option value="bar">Bar Chart</option>
+        <option value="area">Area Chart</option>
+      </select>
+    </div>
+    <button class="btn btn-blue" onclick="animateChart()">▶ Animate Timeline</button>
+  </div>
+
+  <div class="insight-grid" id="insight-grid"></div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title" id="chart-title">Crime Trends Over Time</div>
+    <div id="trend-chart" style="height:420px"></div>
+  </div>
+
+  <div class="cards-row">
+    <div class="card">
+      <div class="card-title">Peak Crime Months</div>
+      <div id="peak-chart" style="height:260px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Year-over-Year Comparison</div>
+      <div id="yoy-chart" style="height:260px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const trendData = {{ trend_json | safe }};
+const districts = {{ districts_json | safe }};
+const crimeTypes = {{ crime_types_json | safe }};
+
+const distSelect = document.getElementById('district-select');
+districts.forEach(d => {
+  const opt = document.createElement('option');
+  opt.value = d; opt.textContent = d;
+  distSelect.appendChild(opt);
+});
+
+const LAYOUT_BASE = {
+  paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+  font:{ color:'#94a3b8', size:11, family:'Inter,sans-serif' },
+  xaxis:{ gridcolor:'#1e2d47', color:'#64748b', zerolinecolor:'#1e2d47' },
+  yaxis:{ gridcolor:'#1e2d47', color:'#64748b', zerolinecolor:'#1e2d47', title:{ text:'Number of FIRs', font:{ color:'#475569' } } },
+  legend:{ bgcolor:'transparent', font:{ color:'#94a3b8', size:10 } },
+  margin:{ t:10, b:60, l:60, r:20 },
+  hovermode:'x unified',
+};
+
+const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#e11d48','#6366f1','#f97316','#14b8a6','#84cc16','#a855f7','#ec4899','#0891b2','#d97706'];
+
+function updateChart() {
+  const mode = document.getElementById('view-mode').value;
+  const chartType = document.getElementById('chart-type').value;
+  const distGroup = document.getElementById('district-group');
+
+  distGroup.style.display = mode === 'single_district' ? 'flex' : 'none';
+
+  let traces = [];
+  let title = '';
+
+  if (mode === 'all_districts') {
+    title = 'Monthly FIR Count — All Districts';
+    const months = [...new Set(trendData.map(d => d.month))].sort();
+    districts.slice(0, 8).forEach((dist, i) => {
+      const distData = trendData.filter(d => d.district === dist);
+      const y = months.map(m => {
+        const items = distData.filter(d => d.month === m);
+        return items.reduce((s,d) => s + d.count, 0);
+      });
+      traces.push({
+        name: dist, x: months, y,
+        type: chartType === 'bar' ? 'bar' : 'scatter',
+        mode: chartType === 'line' ? 'lines+markers' : undefined,
+        fill: chartType === 'area' ? 'tozeroy' : undefined,
+        line: { color: COLORS[i], width: 2 },
+        marker: { color: COLORS[i], size: 4 },
+      });
+    });
+  } else if (mode === 'single_district') {
+    const dist = document.getElementById('district-select').value;
+    title = `Monthly FIR Count — ${dist}`;
+    const distData = trendData.filter(d => d.district === dist);
+    const months = [...new Set(distData.map(d => d.month))].sort();
+    const y = months.map(m => {
+      const items = distData.filter(d => d.month === m);
+      return items.reduce((s,d) => s + d.count, 0);
+    });
+    traces.push({
+      name: dist, x: months, y,
+      type: chartType === 'bar' ? 'bar' : 'scatter',
+      mode: chartType === 'line' ? 'lines+markers' : undefined,
+      fill: chartType === 'area' ? 'tozeroy' : undefined,
+      fillcolor: 'rgba(59,130,246,0.1)',
+      line: { color: '#3b82f6', width: 2.5 },
+      marker: { color: '#3b82f6', size: 5 },
+    });
+  } else {
+    title = 'Monthly FIR Count — By Crime Type';
+    const months = [...new Set(trendData.map(d => d.month))].sort();
+    crimeTypes.slice(0, 6).forEach((ct, i) => {
+      const ctData = trendData.filter(d => d.crime_type === ct);
+      const y = months.map(m => {
+        const items = ctData.filter(d => d.month === m);
+        return items.reduce((s, d) => s + d.count, 0);
+      });
+      traces.push({
+        name: ct, x: months, y,
+        type: chartType === 'bar' ? 'bar' : 'scatter',
+        mode: chartType === 'line' ? 'lines+markers' : undefined,
+        fill: chartType === 'area' ? 'tozeroy' : undefined,
+        line: { color: COLORS[i], width: 2 },
+        marker: { color: COLORS[i], size: 4 },
+      });
+    });
+  }
+
+  document.getElementById('chart-title').textContent = title;
+  Plotly.react('trend-chart', traces, { ...LAYOUT_BASE, barmode: 'stack' });
+  updateInsights();
+}
+
+function animateChart() {
+  const dist = document.getElementById('district-select').value || districts[0];
+  document.getElementById('view-mode').value = 'single_district';
+  document.getElementById('district-group').style.display = 'flex';
+  document.getElementById('district-select').value = dist;
+
+  const distData = trendData.filter(d => d.district === dist);
+  const months = [...new Set(distData.map(d => d.month))].sort();
+  const counts = months.map(m => {
+    const items = distData.filter(d => d.month === m);
+    return items.reduce((s,d) => s + d.count, 0);
+  });
+
+  let i = 1;
+  const interval = setInterval(() => {
+    if (i > months.length) { clearInterval(interval); return; }
+    Plotly.react('trend-chart', [{
+      name: dist,
+      x: months.slice(0, i),
+      y: counts.slice(0, i),
+      type: 'scatter', mode: 'lines+markers',
+      line: { color: '#3b82f6', width: 2.5 },
+      marker: { color: '#3b82f6', size: 5 },
+      fill: 'tozeroy', fillcolor: 'rgba(59,130,246,0.1)',
+    }], { ...LAYOUT_BASE });
+    i++;
+  }, 80);
+}
+
+function updateInsights() {
+  const total = trendData.reduce((s, d) => s + d.count, 0);
+  const byMonth = {};
+  trendData.forEach(d => { byMonth[d.month] = (byMonth[d.month] || 0) + d.count; });
+  const peakMonth = Object.entries(byMonth).sort((a,b)=>b[1]-a[1])[0];
+  const byYear = {};
+  trendData.forEach(d => { const y = d.month.split('-')[0]; byYear[y] = (byYear[y]||0) + d.count; });
+  const years = Object.entries(byYear).sort((a,b)=>a[0].localeCompare(b[0]));
+  const trend = years.length >= 2 ? ((years[years.length-1][1] - years[0][1]) / years[0][1] * 100).toFixed(1) : 0;
+
+  document.getElementById('insight-grid').innerHTML = `
+    <div class="insight-card">
+      <div class="insight-label">Total FIRs in Period</div>
+      <div class="insight-value">${total.toLocaleString()}</div>
+      <div class="insight-sub">Across all districts & years</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Peak Month</div>
+      <div class="insight-value">${peakMonth ? peakMonth[0] : '—'}</div>
+      <div class="insight-sub">${peakMonth ? peakMonth[1] + ' FIRs' : ''}</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Overall Trend</div>
+      <div class="insight-value" style="color:${trend > 0 ? 'var(--red)' : 'var(--green)'}">${trend > 0 ? '+' : ''}${trend}%</div>
+      <div class="insight-sub">${years[0]?.[0]} → ${years[years.length-1]?.[0]}</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Districts Tracked</div>
+      <div class="insight-value">${districts.length}</div>
+      <div class="insight-sub">Karnataka districts</div>
+    </div>
+  `;
+}
+
+const byMonthAll = {};
+trendData.forEach(d => {
+  const m = d.month.split('-')[1];
+  byMonthAll[m] = (byMonthAll[m]||0) + d.count;
+});
+const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+Plotly.newPlot('peak-chart', [{
+  type: 'bar',
+  x: monthNames,
+  y: monthNames.map((_,i) => byMonthAll[String(i+1).padStart(2,'0')] || 0),
+  marker: { color: monthNames.map((_,i) => {
+    const v = byMonthAll[String(i+1).padStart(2,'0')] || 0;
+    const max = Math.max(...Object.values(byMonthAll));
+    return `rgba(59,130,246,${0.3 + (v/max)*0.7})`;
+  })},
+}], { ...LAYOUT_BASE, xaxis: { ...LAYOUT_BASE.xaxis, title:{ text:'Month', font:{ color:'#475569' } } } });
+
+const byYear = {};
+trendData.forEach(d => { const y = d.month.split('-')[0]; byYear[y] = (byYear[y]||0) + d.count; });
+const years = Object.entries(byYear).sort((a,b)=>a[0].localeCompare(b[0]));
+Plotly.newPlot('yoy-chart', [{
+  type: 'bar',
+  x: years.map(y=>y[0]),
+  y: years.map(y=>y[1]),
+  marker: { color: years.map((_,i) => COLORS[i % COLORS.length]) },
+}], { ...LAYOUT_BASE, xaxis: { ...LAYOUT_BASE.xaxis, title:{ text:'Year', font:{ color:'#475569' } } } });
+
+updateChart();
+</script>
+</body>
+</html>

@@ -210,5 +210,23 @@ def api_live_feed():
         })
     return jsonify({"events": events})
 
+@app.route("/trends")
+def trends_page():
+    import pandas as pd
+    work = df_raw.copy()
+    work["fir_date"] = pd.to_datetime(work["fir_date"], errors="coerce")
+    work["month"] = work["fir_date"].dt.to_period("M").astype(str)
+
+    trend_data = work.groupby(["district", "month", "crime_type"]).size().reset_index(name="count")
+    trend_json = trend_data.to_dict("records")
+
+    districts = sorted(df_raw["district"].unique().tolist())
+    crime_types = df_raw["crime_type"].value_counts().index.tolist()
+
+    return render_template("trends.html",
+                           trend_json=json.dumps(trend_json),
+                           districts_json=json.dumps(districts),
+                           crime_types_json=json.dumps(crime_types))
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
