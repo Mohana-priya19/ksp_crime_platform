@@ -105,10 +105,14 @@
   <a href="/mo">🔎 MO Search</a>
   <a href="/alerts">🚨 Alerts</a>
   <a href="/district">📍 Districts</a>
+  <a href="/risk">🎯 Risk Score</a>
 </nav>
 
 <div class="page">
-  <a href="/dedup" class="back-btn">← Back to Deduplication</a>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <a href="/dedup" class="back-btn">← Back to Deduplication</a>
+    <a href="/suspect/{{ cluster.cluster_id }}/export" class="btn btn-blue" style="margin-bottom:20px;">⬇ Export Case as PDF</a>
+  </div>
 
   <div class="profile-header">
     <div class="avatar">{{ cluster.names_found[0][0] | upper }}</div>

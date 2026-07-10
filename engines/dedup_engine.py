@@ -68,17 +68,41 @@ def run_dedup(df, threshold=60.0):
     n = len(suspects)
     print(f"Running dedup on {n} suspects...")
 
+    # Plain dict access is much faster than repeated DataFrame .iloc lookups
+    # inside a tight nested loop.
+    records = suspects.to_dict("records")
+
     uf = UnionFind(n)
     blocks = {}
-    for i, row in suspects.iterrows():
-        key = soundex_simple(row["accused_name"])
+    for i, rec in enumerate(records):
+        key = soundex_simple(rec["accused_name"])
         blocks.setdefault(key, []).append(i)
+
+    name_w, age_w, phone_w, dist_w = (
+        WEIGHTS["name"], WEIGHTS["age"], WEIGHTS["phone_last4"], WEIGHTS["district"]
+    )
 
     matches = 0
     for idxs in blocks.values():
         for i in range(len(idxs)):
-            for j in range(i+1, len(idxs)):
-                conf = compute_confidence(suspects.iloc[idxs[i]], suspects.iloc[idxs[j]])
+            r1 = records[idxs[i]]
+            for j in range(i + 1, len(idxs)):
+                r2 = records[idxs[j]]
+
+                # Cheap scores first. If even a *perfect* name match (1.0)
+                # couldn't push the pair over threshold, skip the expensive
+                # SequenceMatcher name comparison entirely. This never
+                # changes which pairs match — it only skips pairs that are
+                # mathematically guaranteed to fail.
+                age_s = score_age(r1["accused_age"], r2["accused_age"])
+                phone_s = score_phone(r1["accused_phone"], r2["accused_phone"])
+                dist_s = score_district(r1["district"], r2["district"])
+                best_possible = (name_w * 1.0 + age_w * age_s + phone_w * phone_s + dist_w * dist_s) * 100
+                if best_possible < threshold:
+                    continue
+
+                name_s = score_name(r1["accused_name"], r2["accused_name"])
+                conf = round((name_w * name_s + age_w * age_s + phone_w * phone_s + dist_w * dist_s) * 100, 1)
                 if conf >= threshold:
                     uf.union(idxs[i], idxs[j])
                     matches += 1
@@ -116,7 +140,7 @@ def get_identity_clusters(df_deduped):
             "districts":   list(grp["district"].unique()),
             "records":     grp[["fir_id","accused_name","accused_age",
                                  "accused_phone","district","crime_type",
-                                 "fir_date","cluster_size"]].to_dict("records"),
+                                 "fir_date","case_status","cluster_size"]].to_dict("records"),
         })
     clusters.sort(key=lambda x: x["alias_count"], reverse=True)
     return clusters

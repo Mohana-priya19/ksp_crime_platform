@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Predictive Risk Score — KSP Crime Intel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    .risk-card {
+      background: var(--bg-raised, #12162a);
+      border: 1px solid var(--border, #252b40);
+      border-left: 4px solid #64748b;
+      border-radius: 12px;
+      padding: 16px 22px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      transition: transform 0.15s ease;
+    }
+    .risk-card:hover { transform: translateX(3px); }
+    .risk-card.level-critical { border-left-color: #dc2626; }
+    .risk-card.level-high     { border-left-color: #d97706; }
+    .risk-card.level-medium   { border-left-color: #3b82f6; }
+    .risk-card.level-low      { border-left-color: #10b981; }
+
+    .risk-left { flex: 1.4; }
+    .risk-district { font-size: 15px; font-weight: 700; color: var(--text-primary, #e2e8f0); margin-bottom: 4px; }
+    .risk-meta { font-size: 12px; color: var(--text-muted, #64748b); }
+
+    .risk-mid { flex: 2; display: flex; gap: 22px; font-size: 12px; color: var(--text-secondary, #94a3b8); }
+    .risk-stat-num { font-family: var(--font-mono, monospace); font-weight: 700; font-size: 14px; color: var(--text-primary, #e2e8f0); }
+
+    .risk-score-badge {
+      flex-shrink: 0;
+      text-align: center;
+      min-width: 70px;
+    }
+    .risk-score-num { font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 800; }
+    .risk-score-num.level-critical { color: #dc2626; }
+    .risk-score-num.level-high     { color: #d97706; }
+    .risk-score-num.level-medium   { color: #3b82f6; }
+    .risk-score-num.level-low      { color: #10b981; }
+    .risk-level-tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; margin-top: 2px;
+    }
+
+    .trend-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    }
+    .trend-rising  { background: rgba(220,38,38,0.12);  color: #f87171; }
+    .trend-falling { background: rgba(16,185,129,0.12); color: #34d399; }
+    .trend-stable  { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+    .methodology {
+      font-size: 12px; color: var(--text-muted, #64748b); line-height: 1.7;
+    }
+    .methodology b { color: var(--text-secondary, #94a3b8); }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-logo">
+    <div class="shield">⚖</div>
+    <div class="title-block">
+      <span class="org">Karnataka State Police</span>
+      <span class="name">Crime Intelligence</span>
+    </div>
+  </div>
+  <div class="nav-divider"></div>
+  <a href="/">📊 Dashboard</a>
+  <a href="/map">🗺 Hotspot Map</a>
+  <a href="/dedup">🔗 Identity Dedup</a>
+  <a href="/network">🕸 Network</a>
+  <a href="/trends">📈 Trends</a>
+  <a href="/mo">🔎 MO Search</a>
+  <a href="/alerts">🚨 Alerts</a>
+  <a href="/district">📍 Districts</a>
+  <a href="/risk" class="active">🎯 Risk Score</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-eyebrow">Predictive Intelligence</div>
+      <div class="page-title">District Risk Score</div>
+      <div class="page-sub">A 0–100 predictive risk score per district, combining recent crime trend, crime-type severity, anomaly history, and unresolved-case backlog — fully explainable, not a black box.</div>
+    </div>
+  </div>
+
+  <div class="four-col stats-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;">
+    <div class="stat-card accent-red">
+      <div class="stat-label">Critical Risk</div>
+      <div class="stat-value">{{ summary.critical }}</div>
+      <div class="stat-hint warning">Districts</div>
+    </div>
+    <div class="stat-card accent-amber" style="border-top-color:#d97706">
+      <div class="stat-label">High Risk</div>
+      <div class="stat-value">{{ summary.high }}</div>
+      <div class="stat-hint" style="color:#d97706">Districts</div>
+    </div>
+    <div class="stat-card accent-blue">
+      <div class="stat-label">Medium Risk</div>
+      <div class="stat-value">{{ summary.medium }}</div>
+      <div class="stat-hint blue">Districts</div>
+    </div>
+    <div class="stat-card accent-green" style="border-top-color:#10b981">
+      <div class="stat-label">Top Priority</div>
+      <div class="stat-value" style="font-size:18px; margin-top:8px;">{{ summary.top_district }}</div>
+      <div class="stat-hint">Highest risk score</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-title">Risk Score by District</div>
+    <div id="risk-chart" style="height:380px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">How this score is calculated</div>
+    <div class="methodology">
+      <b>Trend (35%)</b> — is the monthly FIR count over the last 6 months rising or falling?
+      &nbsp;·&nbsp; <b>Severity mix (25%)</b> — how violent is the district's crime mix (Murder/Dacoity weigh far more than Theft)?
+      &nbsp;·&nbsp; <b>Anomaly history (20%)</b> — how many statistical spikes has this district had, from the Anomaly Alerts engine?
+      &nbsp;·&nbsp; <b>Case backlog (20%)</b> — what % of cases are still Open or Under Investigation?
+    </div>
+  </div>
+
+  <div class="section-title">Districts — Ranked by Predictive Risk</div>
+
+  {% for r in scores %}
+  <div class="risk-card level-{{ r.risk_level | lower }}">
+    <div class="risk-left">
+      <div class="risk-district">📍 {{ r.district }}</div>
+      <div class="risk-meta">{{ r.total_crimes }} total FIRs on record · {{ r.anomaly_count }} anomaly spike(s) detected</div>
+    </div>
+    <div class="risk-mid">
+      <div>
+        <div class="risk-stat-num">{{ r.last_month_count }}</div>
+        <div>Last month</div>
+      </div>
+      <div>
+        <div class="risk-stat-num">{{ r.predicted_next_month }}</div>
+        <div>Predicted next month</div>
+      </div>
+      <div>
+        <span class="trend-badge trend-{{ r.trend_direction | lower }}">{{ r.trend_direction }}</span>
+        <div style="margin-top:4px;">Trend</div>
+      </div>
+      <div>
+        <div class="risk-stat-num">{{ r.backlog_pct }}%</div>
+        <div>Unresolved</div>
+      </div>
+      <div>
+        <div class="risk-stat-num">{{ r.severity_index }}</div>
+        <div>Severity idx</div>
+      </div>
+    </div>
+    <div class="risk-score-badge">
+      <div class="risk-score-num level-{{ r.risk_level | lower }}">{{ r.risk_score }}</div>
+      <div class="risk-level-tag" style="color:inherit">{{ r.risk_level }}</div>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<script>
+const scores = {{ scores | tojson }};
+const colorFor = (level) => ({
+  "Critical": "#dc2626", "High": "#d97706", "Medium": "#3b82f6", "Low": "#10b981"
+}[level] || "#64748b");
+
+Plotly.newPlot('risk-chart', [{
+  type: 'bar',
+  x: scores.map(s => s.district),
+  y: scores.map(s => s.risk_score),
+  marker: { color: scores.map(s => colorFor(s.risk_level)) },
+  text: scores.map(s => s.risk_level),
+  hovertemplate: '%{x}<br>Risk score: %{y}<br>%{text}<extra></extra>',
+}], {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#94a3b8', size: 12, family: 'Inter, sans-serif' },
+  xaxis: { gridcolor: '#252b40', tickangle: -35, color: '#94a3b8' },
+  yaxis: { gridcolor: '#252b40', title: { text: 'Risk Score (0-100)', font: { color: '#475569' } }, range: [0, 100], color: '#94a3b8' },
+  margin: { t: 10, b: 130, l: 50, r: 20 },
+  bargap: 0.3,
+});
+</script>
+</body>
+</html>

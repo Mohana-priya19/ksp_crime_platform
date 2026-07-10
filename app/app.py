@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 import pandas as pd
 import json
 import random
@@ -10,6 +10,8 @@ from engines.data_generator import generate_fir_records
 from engines.dedup_engine import run_dedup, get_identity_clusters, search_suspect
 from engines.anomaly_detector import detect_anomalies, get_anomaly_summary
 from engines.mo_engine import build_mo_index, search_similar_cases
+from engines.risk_engine import compute_risk_scores, get_risk_summary
+from engines.pdf_export import generate_suspect_case_pdf
 
 app = Flask(__name__, static_folder="static")
 
@@ -46,6 +48,11 @@ print("Building MO index...")
 mo_vectorizer, mo_matrix = build_mo_index(df_raw)
 print("MO index ready.")
 
+risk_scores  = compute_risk_scores(df_raw, anomalies)
+risk_summary = get_risk_summary(risk_scores)
+print(f"Risk scoring: top district is {risk_summary['top_district']} "
+      f"({risk_summary['critical']} critical, {risk_summary['high']} high)")
+
 @app.route("/")
 def index():
     stats = {
@@ -68,6 +75,20 @@ def suspect_profile(cluster_id):
     if not cluster:
         return "Suspect cluster not found", 404
     return render_template("suspect.html", cluster=cluster)
+
+@app.route("/suspect/<cluster_id>/export")
+def suspect_export_pdf(cluster_id):
+    cluster = clusters_by_id.get(cluster_id)
+    if not cluster:
+        return "Suspect cluster not found", 404
+    pdf_buffer = generate_suspect_case_pdf(cluster)
+    filename = f"KSP_Case_{cluster_id}_{cluster['names_found'][0].replace(' ', '_')}.pdf"
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
+    )
 
 @app.route("/network")
 def network_page():
@@ -228,5 +249,11 @@ def trends_page():
                            districts_json=json.dumps(districts),
                            crime_types_json=json.dumps(crime_types))
 
+@app.route("/risk")
+def risk_page():
+    return render_template("risk.html", scores=risk_scores, summary=risk_summary)
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    import os
+    port = int(os.getenv("X_ZOHO_CATALYST_LISTEN_PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)

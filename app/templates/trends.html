@@ -67,11 +67,12 @@
   <a href="/">📊 Dashboard</a>
   <a href="/map">🗺 Hotspot Map</a>
   <a href="/dedup">🔗 Identity Dedup</a>
-  <a href="/alerts">🚨 Alerts</a>
   <a href="/network">🕸 Network</a>
-  <a href="/mo">🔎 MO Search</a>
   <a href="/trends" class="active">📈 Trends</a>
+  <a href="/mo">🔎 MO Search</a>
+  <a href="/alerts">🚨 Alerts</a>
   <a href="/district">📍 Districts</a>
+  <a href="/risk">🎯 Risk Score</a>
 </nav>
 
 <div class="page">
@@ -128,6 +129,7 @@
 
 <script>
 const trendData = {{ trend_json | safe }};
+let animationTimer = null;
 const districts = {{ districts_json | safe }};
 const crimeTypes = {{ crime_types_json | safe }};
 
@@ -151,6 +153,8 @@ const LAYOUT_BASE = {
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#e11d48','#6366f1','#f97316','#14b8a6','#84cc16','#a855f7','#ec4899','#0891b2','#d97706'];
 
 function updateChart() {
+  if (animationTimer) { clearInterval(animationTimer); animationTimer = null; }
+
   const mode = document.getElementById('view-mode').value;
   const chartType = document.getElementById('chart-type').value;
   const distGroup = document.getElementById('district-group');
@@ -222,10 +226,14 @@ function updateChart() {
 }
 
 function animateChart() {
+  if (animationTimer) { clearInterval(animationTimer); animationTimer = null; }
+
   const dist = document.getElementById('district-select').value || districts[0];
+  const chartType = document.getElementById('chart-type').value;
   document.getElementById('view-mode').value = 'single_district';
   document.getElementById('district-group').style.display = 'flex';
   document.getElementById('district-select').value = dist;
+  document.getElementById('chart-title').textContent = `Monthly FIR Count — ${dist} (Animated)`;
 
   const distData = trendData.filter(d => d.district === dist);
   const months = [...new Set(distData.map(d => d.month))].sort();
@@ -235,16 +243,18 @@ function animateChart() {
   });
 
   let i = 1;
-  const interval = setInterval(() => {
-    if (i > months.length) { clearInterval(interval); return; }
+  animationTimer = setInterval(() => {
+    if (i > months.length) { clearInterval(animationTimer); animationTimer = null; return; }
     Plotly.react('trend-chart', [{
       name: dist,
       x: months.slice(0, i),
       y: counts.slice(0, i),
-      type: 'scatter', mode: 'lines+markers',
+      type: chartType === 'bar' ? 'bar' : 'scatter',
+      mode: chartType === 'line' ? 'lines+markers' : undefined,
+      fill: chartType === 'area' ? 'tozeroy' : undefined,
+      fillcolor: 'rgba(59,130,246,0.1)',
       line: { color: '#3b82f6', width: 2.5 },
       marker: { color: '#3b82f6', size: 5 },
-      fill: 'tozeroy', fillcolor: 'rgba(59,130,246,0.1)',
     }], { ...LAYOUT_BASE });
     i++;
   }, 80);
