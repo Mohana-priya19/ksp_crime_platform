@@ -3,10 +3,20 @@ import numpy as np
 import random
 from datetime import datetime, timedelta
 
+# Fixed seed so the dataset is reproducible — anyone on the team who
+# regenerates it gets the exact same records, cluster IDs, and stats.
+# Without this, every regeneration silently shifts all the demo numbers.
+random.seed(42)
+np.random.seed(42)
+
 DISTRICTS = [
     "Bengaluru Urban", "Mysuru", "Mangaluru", "Hubballi-Dharwad",
     "Belagavi", "Kalaburagi", "Ballari", "Tumakuru", "Shivamogga",
-    "Davangere", "Vijayapura", "Udupi", "Hassan", "Raichur", "Bagalkot"
+    "Davangere", "Vijayapura", "Udupi", "Hassan", "Raichur", "Bagalkot",
+    "Bengaluru Rural", "Bidar", "Chamarajanagar", "Chikkaballapur",
+    "Chikkamagaluru", "Chitradurga", "Gadag", "Haveri", "Kodagu",
+    "Kolar", "Koppal", "Mandya", "Ramanagara", "Uttara Kannada",
+    "Yadgir", "Vijayanagara",
 ]
 
 DISTRICT_COORDS = {
@@ -18,6 +28,14 @@ DISTRICT_COORDS = {
     "Vijayapura": (16.8302, 75.7100), "Udupi": (13.3409, 74.7421),
     "Hassan": (13.0033, 76.1004), "Raichur": (16.2120, 77.3566),
     "Bagalkot": (16.1691, 75.6615),
+    "Bengaluru Rural": (13.2257, 77.7502), "Bidar": (17.9104, 77.5199),
+    "Chamarajanagar": (11.9236, 76.9456), "Chikkaballapur": (13.4355, 77.7315),
+    "Chikkamagaluru": (13.3161, 75.7720), "Chitradurga": (14.2251, 76.3980),
+    "Gadag": (15.4167, 75.6167), "Haveri": (14.7936, 75.4041),
+    "Kodagu": (12.4244, 75.7382), "Kolar": (13.1367, 78.1298),
+    "Koppal": (15.3503, 76.1548), "Mandya": (12.5242, 76.8958),
+    "Ramanagara": (12.7217, 77.2812), "Uttara Kannada": (14.8022, 74.1240),
+    "Yadgir": (16.7690, 77.1377), "Vijayanagara": (15.2691, 76.3874),
 }
 
 CRIME_TYPES = ["Theft", "Chain Snatching", "Robbery", "Burglary",
@@ -146,6 +164,6 @@ def generate_fir_records(n=5000):
 if __name__ == "__main__":
     import os
     os.makedirs("../data", exist_ok=True)
-    df = generate_fir_records(5000)
+    df = generate_fir_records(10000)
     df.to_csv("../data/karnataka_fir_synthetic.csv", index=False)
     print("Saved to data/karnataka_fir_synthetic.csv")

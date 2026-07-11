@@ -4,10 +4,10 @@
 ---
 
 ## Before you start
-- Have the app running and already loaded (dedup takes ~1 second now, so no awkward wait).
+- Have the app running and already loaded (dedup takes ~4 seconds now, so no awkward wait).
 - Open the Dashboard (`/`) as your starting tab. Don't click anything yet.
 - One person talks, one person drives the mouse/keyboard. Rehearse the handoff so it's not clunky.
-- Know your numbers cold: **5,010 FIRs, 106 identity clusters, 121 alias matches, 32 anomalies, 15 districts risk-scored.**
+- Know your numbers cold: **10,010 FIRs, 31 districts (all of Karnataka), 252 identity clusters, 54 anomalies, 6 critical.**
 
 ---
 
@@ -25,7 +25,7 @@
 
 Click to **Dashboard**. Let the live FIR ticker run for 2 seconds without narrating — it looks alive on its own.
 
-> "5,010 FIRs. Nine intelligence tools. One connected system."
+> "10,010 FIRs. Nine intelligence tools. One connected system."
 
 ---
 
@@ -35,9 +35,9 @@ Navigate to **Identity Dedup** (`/dedup`).
 
 > "This is the core of the platform. We run every accused name through Soundex phonetic matching, then score similarity on name, age, phone number, and district — including neighboring districts, since offenders often move to adjacent areas, not random ones."
 
-Search or scroll to find **Cluster CLUSTER_0287**.
+Search or scroll to find **Cluster CLUSTER_0330**.
 
-> "Here he is. Raju Gowda. Rajesh K. Raju Kumar. Raju Naik. Raj Kumar. Five names, five FIRs, five districts — Tumakuru, Mysuru, Bengaluru Urban, Shivamogga, Hubballi-Dharwad. Same phone number pattern, same age bracket, same crime type: Chain Snatching, every time. Our engine links them at **61.7% confidence** — flagged, not buried."
+> "Here he is. Raju Gowda. Rajesh K. Raju Kumar. Raju Naik. Raj Kumar. Five names, five FIRs, five districts — Tumakuru, Mysuru, Bengaluru Urban, Shivamogga, Hubballi-Dharwad. Same phone number pattern, same age bracket, same crime type: Chain Snatching, every time. Our engine links them at **73.9% confidence** — flagged, not buried."
 
 Click into the cluster → **Suspect Profile** page.
 
@@ -69,13 +69,13 @@ Navigate to **Risk Score** (`/risk`).
 
 > "Everything so far has been about catching what already happened. This is where we get ahead of it. Every district gets a 0–100 predictive risk score, built from four transparent signals: recent crime trend, crime severity mix, anomaly history, and unresolved case backlog. Not a black box — an officer can see exactly why a district is flagged."
 
-Point to the top-ranked district.
+Point to the top-ranked districts.
 
-> "Right now, Tumakuru — the same district Raju Gowda was operating in — is flagged high-risk. That's not a coincidence we told the model. That's the model independently surfacing the same threat."
+> "Right now, Ballari and Udupi top the list — and Hubballi-Dharwad, one of the five districts Raju Gowda operated in, sits right behind them at third. That's not a coincidence we told the model. That's the model independently surfacing the same threat we just uncovered by hand."
 
 Navigate to **Anomaly Alerts** (`/alerts`).
 
-> "And when something breaks pattern in real time — like Hubballi-Dharwad in October 2018, where robbery cases jumped 136% above that district's own historical average — we catch it with statistical confidence, not guesswork. Z-score of 3.43. That's a genuine outlier, not noise."
+> "And when something breaks pattern in real time — like Uttara Kannada in March 2023, where theft cases jumped 154% above that district's own historical average — we catch it with statistical confidence, not guesswork. Z-score of 3.58. That's a genuine outlier, not noise. And this is a district that used to fall completely outside our coverage before we expanded to all 31 districts of Karnataka."
 
 ---
 
@@ -100,7 +100,7 @@ Return to **Dashboard**.
 > "We use a weighted confidence score — 35% phone number, 30% name similarity, 20% age, 15% district — and only flag matches above threshold. We deliberately show the confidence percentage rather than a binary yes/no, because an investigator should verify before acting, not blindly trust the system."
 
 **"Can this scale to the whole state?"**
-> "Yes — the identity matching is blocked using Soundex, so it doesn't compare every record to every other record. We optimized it to run 5,010 records in about a second; the same approach scales to hundreds of thousands."
+> "Yes — we already run it across all 31 districts of Karnataka, not a subset. The identity matching is blocked using Soundex, so it doesn't compare every record to every other record. We optimized it to run 10,010 records in under 4 seconds; the same approach scales to hundreds of thousands."
 
 **"What would it take to actually deploy this for KSP?"**
 > "Swap the synthetic CSV for a live FIR database connection, add authentication for officer logins, and it's production-ready. The architecture doesn't change."
@@ -111,5 +111,5 @@ Return to **Dashboard**.
 - [ ] Run through it twice out loud, with a timer, before the real thing
 - [ ] Practice the mouse handoff between speaker and driver
 - [ ] Have a backup screen recording in case live wifi/demo fails
-- [ ] Know the exact cluster ID (CLUSTER_0287) and don't rely on search working live — bookmark the URL directly: `/suspect/CLUSTER_0287`
+- [ ] Know the exact cluster ID (CLUSTER_0330) and don't rely on search working live — bookmark the URL directly: `/suspect/CLUSTER_0330`
 - [ ] Assign one teammate to watch the clock and give a silent 30-seconds-left signal
